@@ -285,3 +285,30 @@ html, body {
     background: #4CAF50;
     border-radius: 4px;
 }
+
+.input-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.input-clear-button {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 0 5px;
+    display: none;
+}
+
+.input-clear-button:hover {
+    color: #fff;
+}
+
+/* Show clear button when there's text */
+#promptInput:not(:placeholder-shown) + .input-clear-button {
+    display: block;
+}

@@ -90,8 +90,10 @@ document.getElementById("generateButton").addEventListener("click", async functi
             document.getElementById("codeInput").value = data.code.trim();
 
             // Render the code in the iframe
-            iframe.srcdoc = data.code;
-            iframe.style.backgroundColor = "white";
+            if (data.code) {
+                updateIframeContent(data.code);
+                iframe.style.backgroundColor = "white";
+            }
 
         } catch (error) {
             console.error('Error:', error);
@@ -109,16 +111,27 @@ document.getElementById("generateButton").addEventListener("click", async functi
 document.getElementById("codeInput").addEventListener("input", function () {
     const updatedCode = document.getElementById("codeInput").value;
     const iframe = document.getElementById("iframe");
-    iframe.srcdoc = updatedCode;
-    iframe.style.backgroundColor = updatedCode.trim() ? "white" : "#121212";
+    if (updatedCode.trim()) {
+        updateIframeContent(updatedCode);
+        iframe.style.backgroundColor = "white";
+    } else {
+        iframe.srcdoc = "<html><body></body></html>";
+        iframe.style.backgroundColor = "#121212";
+    }
 });
 
 // Clear button functionality
 document.getElementById("clearButton").addEventListener("click", function() {
+    // Clear all inputs
     document.getElementById("promptInput").value = "";
     document.getElementById("codeInput").value = "";
     document.getElementById("iframe").srcdoc = "<html><body></body></html>";
     document.getElementById("iframe").style.backgroundColor = "#121212";
+    
+    // Clear history
+    promptHistory = [];
+    generatedImages.clear();
+    updateHistoryDisplay();
 });
 
 // Open in new tab functionality
@@ -130,3 +143,37 @@ document.getElementById("openInNewTab").addEventListener("click", function() {
         newWindow.document.close();
     }
 });
+
+// Clear text button functionality
+document.getElementById("clearText").addEventListener("click", function() {
+    document.getElementById("promptInput").value = "";
+});
+
+// Fix iframe routing by setting base URL and target for links
+function updateIframeContent(htmlContent) {
+    const iframe = document.getElementById("iframe");
+    const baseUrl = window.location.origin;
+    
+    // Add base tag and target="_blank" to all links
+    const modifiedHtml = `
+        <html>
+            <head>
+                <base href="${baseUrl}/">
+            </head>
+            <body>
+                ${htmlContent}
+                <script>
+                    // Make all links open in new tab
+                    document.addEventListener('click', function(e) {
+                        if (e.target.tagName === 'A') {
+                            e.preventDefault();
+                            window.open(e.target.href, '_blank');
+                        }
+                    });
+                </script>
+            </body>
+        </html>
+    `;
+    
+    iframe.srcdoc = modifiedHtml;
+}

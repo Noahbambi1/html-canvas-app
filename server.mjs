@@ -31,42 +31,65 @@ async function generateAndSaveImage(prompt) {
                 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
             },
             body: JSON.stringify({
-                model: "dall-e-3",
+                model: "dall-e-2",
                 prompt: prompt,
-                n: 1,
-                size: "1024x1024"
+                n: 2,
+                size: "256x256",
+                style: "natural",
+                quality: "standard"
             })
         });
 
         const data = await response.json();
         
-        if (data.data && data.data[0].url) {
-            // Download the image
-            const imageResponse = await fetch(data.data[0].url);
-            const arrayBuffer = await imageResponse.arrayBuffer();
-            const buffer = Buffer.from(arrayBuffer);
-            
-            // Generate unique filename
-            const filename = `${crypto.randomBytes(16).toString('hex')}.png`;
-            const filepath = path.join(imagesDir, filename);
-            
-            // Save the image
-            await fs.writeFile(filepath, buffer);
-            
-            // Return the path relative to public directory
-            return `/generated-images/${filename}`;
-        } else {
-            throw new Error('No image URL in response');
+        // Log the full response for debugging
+        console.log('DALL-E API Response:', JSON.stringify(data, null, 2));
+
+        // Check if there's an error in the response
+        if (data.error) {
+            throw new Error(`DALL-E API Error: ${data.error.message}`);
         }
+        
+        if (!data.data || !data.data[0] || !data.data[0].url) {
+            throw new Error(`Invalid response structure: ${JSON.stringify(data)}`);
+        }
+
+        // Download the image
+        const imageUrl = data.data[0].url;
+        console.log('Attempting to download image from:', imageUrl);
+        
+        const imageResponse = await fetch(imageUrl);
+        if (!imageResponse.ok) {
+            throw new Error(`Failed to download image: ${imageResponse.status} ${imageResponse.statusText}`);
+        }
+
+        const arrayBuffer = await imageResponse.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        
+        // Generate unique filename
+        const filename = `${crypto.randomBytes(16).toString('hex')}.png`;
+        const filepath = path.join(imagesDir, filename);
+        
+        // Save the image
+        await fs.writeFile(filepath, buffer);
+        console.log('Image saved successfully to:', filepath);
+        
+        // Return the path relative to public directory
+        return `/generated-images/${filename}`;
     } catch (error) {
-        console.error('Error generating image:', error);
+        console.error('Error in generateAndSaveImage:', error);
+        console.error('Error details:', {
+            message: error.message,
+            stack: error.stack,
+            prompt: prompt
+        });
         throw error;
     }
 }
 
 app.post('/generate', async (req, res) => {
     const prompt = req.query.prompt;
-    const model = req.query.model || 'gpt-4';
+    const model = req.query.model || 'gpt-3.5-turbo';
     const { currentCode, generatedImages } = req.body;
 
     if (!prompt) {
@@ -113,13 +136,25 @@ app.post('/generate', async (req, res) => {
                     if (generatedImages && generatedImages[imagePrompt]) {
                         generatedCode = generatedCode.replace(match[0], generatedImages[imagePrompt]);
                     } else {
-                        const imagePath = await generateAndSaveImage(imagePrompt);
-                        generatedCode = generatedCode.replace(match[0], imagePath);
-                        newImages[imagePrompt] = imagePath;
+                        try {
+                            const imagePath = await generateAndSaveImage(imagePrompt);
+                            generatedCode = generatedCode.replace(match[0], imagePath);
+                            newImages[imagePrompt] = imagePath;
+                        } catch (imageError) {
+                            console.error('Failed to generate image:', imageError);
+                            // Use a placeholder image instead of failing completely
+                            generatedCode = generatedCode.replace(
+                                match[0], 
+                                'https://placehold.co/512x512/333/fff/png?text=Image+Generation+Failed'
+                            );
+                        }
                     }
                 } catch (error) {
-                    console.error('Error generating image:', error);
-                    generatedCode = generatedCode.replace(match[0], '/path/to/error-image.png');
+                    console.error('Error processing image:', error);
+                    generatedCode = generatedCode.replace(
+                        match[0], 
+                        'https://placehold.co/512x512/333/fff/png?text=Image+Generation+Failed'
+                    );
                 }
             }
             
