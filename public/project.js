@@ -3,6 +3,7 @@ let promptHistory = [];
 let generatedImages = new Map();
 let currentFile = null;
 let useDallE = true;
+let isFirstPrompt = true;
 
 // Initialize the application
 function init() {
@@ -46,11 +47,15 @@ async function generateProject() {
             body: JSON.stringify({
                 currentFiles: Object.fromEntries(projectFiles),
                 generatedImages: Object.fromEntries(generatedImages),
-                useDallE
+                useDallE,
+                isInitialPrompt: isFirstPrompt
             })
         });
 
         const data = await response.json();
+        
+        // Update the flag after first prompt
+        isFirstPrompt = false;
         
         // Update project files
         projectFiles.clear();
@@ -238,6 +243,7 @@ function clearAll() {
     promptHistory = [];
     generatedImages.clear();
     updateHistoryDisplay();
+    isFirstPrompt = true;
 }
 
 function showLoading(show) {
