@@ -4,6 +4,7 @@ import express from 'express';  // Import express
 import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
+import archiver from 'archiver';
 
 dotenv.config();
 
@@ -170,6 +171,123 @@ app.post('/generate', async (req, res) => {
         console.error('Error generating code:', error);
         res.status(500).send('Failed to generate code');
     }
+});
+
+// Add this new endpoint for project generation
+app.post('/generate-project', async (req, res) => {
+    const prompt = req.query.prompt;
+    const model = req.query.model || 'gpt-3.5-turbo';
+    const { currentFiles, generatedImages } = req.body;
+
+    if (!prompt) {
+        return res.status(400).send('Prompt is required');
+    }
+
+    try {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+            },
+            body: JSON.stringify({
+                model: model,
+                messages: [{ 
+                    role: 'user', 
+                    content: `Create a multi-page HTML project with the following prompt: ${prompt}. 
+                    Current project files: ${JSON.stringify(currentFiles || {}, null, 2)}
+                    
+                    Return a JSON object with the following structure:
+                    {
+                        "files": {
+                            "index.html": "content",
+                            "style.css": "content",
+                            "other-pages.html": "content"
+                        }
+                    }
+                    
+                    You can include images using {{generate_image: image description}}.
+                    Include proper navigation between pages.
+                    Just return the JSON and nothing else.` 
+                }],
+                max_tokens: 4096
+            })
+        });
+
+        const data = await response.json();
+        
+        if (data.choices && data.choices[0]) {
+            let projectData;
+            try {
+                projectData = JSON.parse(data.choices[0].message.content);
+            } catch (e) {
+                throw new Error('Invalid JSON response from AI');
+            }
+
+            const newImages = {};
+            
+            // Process images in all files
+            for (const [filename, content] of Object.entries(projectData.files)) {
+                let processedContent = content;
+                const imageRegex = /{{generate_image:\s*(.*?)}}/g;
+                let match;
+
+                while ((match = imageRegex.exec(content)) !== null) {
+                    const imagePrompt = match[1];
+                    try {
+                        if (generatedImages && generatedImages[imagePrompt]) {
+                            processedContent = processedContent.replace(match[0], generatedImages[imagePrompt]);
+                        } else {
+                            const imagePath = await generateAndSaveImage(imagePrompt);
+                            processedContent = processedContent.replace(match[0], imagePath);
+                            newImages[imagePrompt] = imagePath;
+                        }
+                    } catch (error) {
+                        console.error('Error generating image:', error);
+                        processedContent = processedContent.replace(
+                            match[0],
+                            'https://placehold.co/512x512/333/fff/png?text=Image+Generation+Failed'
+                        );
+                    }
+                }
+                projectData.files[filename] = processedContent;
+            }
+
+            res.json({
+                files: projectData.files,
+                newImages
+            });
+        } else {
+            res.status(500).send('Error: No valid response from AI');
+        }
+
+    } catch (error) {
+        console.error('Error generating project:', error);
+        res.status(500).send('Failed to generate project');
+    }
+});
+
+// Add endpoint for project download
+app.post('/download-project', (req, res) => {
+    const files = req.body;
+    
+    res.writeHead(200, {
+        'Content-Type': 'application/zip',
+        'Content-Disposition': 'attachment; filename=project.zip'
+    });
+
+    const archive = archiver('zip', {
+        zlib: { level: 9 }
+    });
+
+    archive.pipe(res);
+
+    // Add each file to the zip
+    Object.entries(files).forEach(([filename, content]) => {
+        archive.append(content, { name: filename });
+    });
+
+    archive.finalize();
 });
 
 app.listen(port, () => {

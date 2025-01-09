@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI HTML Generator</title>
+    <title>AI Project Generator</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="header">
         <div class="header-content">
-            <div class="title">AI HTML Generator</div>
+            <div class="title">AI Project Generator</div>
             <div class="nav-links">
-                <a href="index.html" class="active">Single Page</a>
-                <a href="project.html">Project</a>
+                <a href="index.html">Single Page</a>
+                <a href="project.html" class="active">Project</a>
             </div>
             <div class="model-selector">
                 <select id="modelSelect">
@@ -26,33 +26,41 @@
     <div id="app">
         <div id="prompt">
             <div class="input-wrapper">
-                <textarea id="promptInput" placeholder="Enter your prompt here..."></textarea>
+                <textarea id="promptInput" placeholder="Describe your project (pages, features, styling, etc.)..."></textarea>
                 <button id="clearText" class="input-clear-button">×</button>
             </div>
             <div class="button-group">
-                <button id="generateButton">Generate HTML</button>
+                <button id="generateButton">Generate Project</button>
                 <button id="clearButton">Clear All</button>
+                <button id="downloadProject">Download Project</button>
             </div>
             <div class="spinner" id="loadingSpinner"></div>
             <div id="promptHistory"></div>
         </div>
 
         <div id="splitter">
-            <div id="codeSection">
+            <div id="projectFiles">
                 <div class="section-header">
-                    <h2>Generated HTML Code</h2>
-                    <button id="copyToClipboard">Copy Code</button>
+                    <h2>Project Files</h2>
+                    <button id="copyToClipboard">Copy Selected</button>
                 </div>
                 <div class="content-wrapper">
-                    <textarea id="codeInput"></textarea>
-                    <div class="spinner" id="codeSpinner"></div>
+                    <div id="fileTree"></div>
+                    <div id="fileContent">
+                        <textarea id="codeInput"></textarea>
+                    </div>
                 </div>
             </div>
 
             <div id="renderedSection">
                 <div class="section-header">
-                    <h2>Rendered HTML</h2>
-                    <button id="openInNewTab">Open in New Tab</button>
+                    <h2>Preview</h2>
+                    <div class="preview-controls">
+                        <select id="pageSelect">
+                            <option value="">Select Page...</option>
+                        </select>
+                        <button id="openInNewTab">Open in New Tab</button>
+                    </div>
                 </div>
                 <div class="content-wrapper">
                     <iframe id="iframe" srcdoc="<html><body></body></html>"></iframe>
@@ -62,6 +70,6 @@
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script src="project.js"></script>
 </body>
-</html>
+</html> 
