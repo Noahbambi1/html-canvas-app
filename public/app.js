@@ -48,3 +48,21 @@ document.getElementById("codeInput").addEventListener("input", function () {
     iframe.srcdoc = updatedCode;
     iframe.style.backgroundColor = updatedCode.trim() ? "white" : "#121212";
 });
+
+// Clear button functionality
+document.getElementById("clearButton").addEventListener("click", function() {
+    document.getElementById("promptInput").value = "";
+    document.getElementById("codeInput").value = "";
+    document.getElementById("iframe").srcdoc = "<html><body></body></html>";
+    document.getElementById("iframe").style.backgroundColor = "#121212";
+});
+
+// Open in new tab functionality
+document.getElementById("openInNewTab").addEventListener("click", function() {
+    const iframeContent = document.getElementById("codeInput").value;
+    if (iframeContent.trim()) {
+        const newWindow = window.open();
+        newWindow.document.write(iframeContent);
+        newWindow.document.close();
+    }
+});
