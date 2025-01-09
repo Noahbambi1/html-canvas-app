@@ -49,11 +49,13 @@ async function generateImage(prompt, useDallE = true) {
             await generateAndSaveImage(prompt) : 
             await searchAndSaveImage(prompt);
         
-        // Ensure the response is wrapped in an img tag
-        if (imagePath.startsWith('http') || imagePath.startsWith('/')) {
-            return `<img src="${imagePath}" alt="${prompt}" style="max-width: 100%; height: auto; border-radius: 8px;">`;
+        // Return just the path if it's already a complete img tag
+        if (imagePath.startsWith('<img')) {
+            return imagePath;
         }
-        return imagePath; // Already wrapped in img tag
+        
+        // Otherwise, wrap it in an img tag
+        return `<img src="${imagePath}" alt="${prompt}" style="max-width: 100%; height: auto; border-radius: 8px;">`;
     } catch (error) {
         console.error('Error in generateImage:', error);
         return `<img src="${generatePlaceholder('Image Generation Failed')}" alt="Error generating image" style="max-width: 100%; height: auto; border-radius: 8px;">`;
@@ -219,7 +221,7 @@ async function generateAndSaveImage(prompt, retryCount = 0) {
     }
 }
 
-// Update the processImages function with better error handling
+// Update the processImages function to handle image tags properly
 async function processImages(content, generatedImages, useDallE) {
     if (!content) {
         console.error('Empty content received in processImages');
@@ -243,7 +245,7 @@ async function processImages(content, generatedImages, useDallE) {
         
         if (generatedImages && generatedImages[imagePrompt]) {
             const cachedImage = generatedImages[imagePrompt];
-            // Ensure cached images are wrapped in img tags
+            // Use cached image as-is if it's already an img tag
             const imgTag = cachedImage.startsWith('<img') ? 
                 cachedImage : 
                 `<img src="${cachedImage}" alt="${imagePrompt}" style="max-width: 100%; height: auto; border-radius: 8px;">`;
@@ -281,6 +283,7 @@ async function processImages(content, generatedImages, useDallE) {
                 
                 processedContent = processedContent.replace(result.match, result.imagePath);
                 if (result.prompt) {
+                    // Store the complete img tag in newImages
                     newImages[result.prompt] = result.imagePath;
                 }
             }
