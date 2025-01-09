@@ -5,6 +5,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
 import archiver from 'archiver';
+import { setTimeout } from 'timers/promises';
 
 dotenv.config();
 
@@ -22,9 +23,40 @@ try {
 app.use(express.static('public'));
 app.use(express.json()); // Add this near the top with other middleware
 
-// Add new endpoint for image generation
-async function generateAndSaveImage(prompt) {
+// Add rate limiting tracking
+const imageRateLimit = {
+    limit: 5,
+    interval: 60000, // 1 minute in milliseconds
+    queue: [],
+    lastReset: Date.now()
+};
+
+// Add retry logic to image generation
+async function generateAndSaveImage(prompt, retryCount = 0) {
+    const maxRetries = 3;
+    const retryDelay = 65000; // 65 seconds to be safe
+
     try {
+        // Check and update rate limit
+        const now = Date.now();
+        if (now - imageRateLimit.lastReset > imageRateLimit.interval) {
+            imageRateLimit.queue = [];
+            imageRateLimit.lastReset = now;
+        }
+
+        // If we're at the limit, wait or retry
+        if (imageRateLimit.queue.length >= imageRateLimit.limit) {
+            if (retryCount >= maxRetries) {
+                throw new Error('Max retries reached for image generation');
+            }
+            console.log(`Rate limit reached, waiting ${retryDelay/1000} seconds before retry ${retryCount + 1}...`);
+            await setTimeout(retryDelay);
+            return generateAndSaveImage(prompt, retryCount + 1);
+        }
+
+        // Add to queue
+        imageRateLimit.queue.push(now);
+
         const response = await fetch('https://api.openai.com/v1/images/generations', {
             method: 'POST',
             headers: {
@@ -48,6 +80,12 @@ async function generateAndSaveImage(prompt) {
 
         // Check if there's an error in the response
         if (data.error) {
+            // If it's a rate limit error, retry
+            if (data.error.message.includes('Rate limit exceeded') && retryCount < maxRetries) {
+                console.log(`Rate limit error, waiting ${retryDelay/1000} seconds before retry ${retryCount + 1}...`);
+                await setTimeout(retryDelay);
+                return generateAndSaveImage(prompt, retryCount + 1);
+            }
             throw new Error(`DALL-E API Error: ${data.error.message}`);
         }
         
@@ -82,8 +120,17 @@ async function generateAndSaveImage(prompt) {
         console.error('Error details:', {
             message: error.message,
             stack: error.stack,
-            prompt: prompt
+            prompt: prompt,
+            retryCount
         });
+
+        // If we haven't hit max retries and it's a rate limit error, retry
+        if (error.message.includes('Rate limit exceeded') && retryCount < maxRetries) {
+            console.log(`Rate limit error, waiting ${retryDelay/1000} seconds before retry ${retryCount + 1}...`);
+            await setTimeout(retryDelay);
+            return generateAndSaveImage(prompt, retryCount + 1);
+        }
+
         throw error;
     }
 }
