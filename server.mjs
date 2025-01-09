@@ -66,7 +66,7 @@ async function generateAndSaveImage(prompt, retryCount = 0) {
             body: JSON.stringify({
                 model: "dall-e-2",
                 prompt: prompt,
-                n: 2,
+                n: 1,
                 size: "256x256",
                 style: "natural",
                 quality: "standard"
@@ -155,9 +155,19 @@ app.post('/generate', async (req, res) => {
                 model: model,
                 messages: [{ 
                     role: 'user', 
-                    content: `Update or create HTML with the following prompt: ${prompt}. 
+                    content: `Create a web page with the following prompt: ${prompt}. 
+                    Include product images using the syntax {{generate_image: description of product}}.
+                    The HTML should render the image link in an image tag like this:
+                    <img src="{{generate_image: professional photo of product}}" alt="Product description">
+                    
+                    Make sure to:
+                    1. Generate unique images for each product
+                    2. Include proper image descriptions in the generate_image tags
+                    3. Use descriptive alt text for accessibility
+                    4. Keep image sizes reasonable
+                    5. Always wrap image placeholders in proper <img> tags
+                    
                     Current HTML: ${currentCode || 'None'}
-                    You can include images by using the syntax {{generate_image: image description}}.
                     Just return the HTML and nothing else.` 
                 }],
                 max_tokens: 4096
@@ -253,7 +263,11 @@ app.post('/generate-project', async (req, res) => {
                         }
                     }
                     
-                    You can include images using {{generate_image: image description}}.
+                    For images, use the syntax {{generate_image: description}} inside img tags like this:
+                    <img src="{{generate_image: description of image}}" alt="Description">
+                    
+                    The HTML should render the image link in an image tag.
+                    Make sure all image placeholders are properly wrapped in <img> tags.
                     Include proper navigation between pages.
                     Just return the JSON and nothing else.` 
                 }],
