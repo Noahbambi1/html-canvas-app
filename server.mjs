@@ -39,48 +39,88 @@ const SEARCH_ENGINE_ID = process.env.SEARCH_ENGINE_ID;
 
 // Modified image generation function
 async function generateImage(prompt, useDallE = true) {
-    if (useDallE) {
-        return generateAndSaveImage(prompt);
-    } else {
-        return searchAndSaveImage(prompt);
+    if (!prompt) {
+        console.error('Empty prompt received in generateImage');
+        return generatePlaceholder('Invalid Image Prompt');
+    }
+
+    try {
+        const imagePath = useDallE ? 
+            await generateAndSaveImage(prompt) : 
+            await searchAndSaveImage(prompt);
+        
+        // Ensure the response is wrapped in an img tag
+        if (imagePath.startsWith('http') || imagePath.startsWith('/')) {
+            return `<img src="${imagePath}" alt="${prompt}" style="max-width: 100%; height: auto; border-radius: 8px;">`;
+        }
+        return imagePath; // Already wrapped in img tag
+    } catch (error) {
+        console.error('Error in generateImage:', error);
+        return `<img src="${generatePlaceholder('Image Generation Failed')}" alt="Error generating image" style="max-width: 100%; height: auto; border-radius: 8px;">`;
     }
 }
 
 // Add Google image search function
 async function searchAndSaveImage(prompt) {
     try {
-        const searchUrl = `https://customsearch.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${SEARCH_ENGINE_ID}&q=${encodeURIComponent(prompt)}&searchType=image&num=1&safe=active`;
+        if (!GOOGLE_API_KEY || !SEARCH_ENGINE_ID) {
+            console.error('Missing Google API credentials');
+            return generatePlaceholder('Missing Google API Configuration');
+        }
+
+        const searchUrl = `https://customsearch.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${SEARCH_ENGINE_ID}&q=${encodeURIComponent(prompt)}&searchType=image&num=1&safe=active&imgSize=MEDIUM`;
         
         const response = await fetch(searchUrl);
         const data = await response.json();
 
+        // Log the response for debugging
+        console.log('Google Search API Response:', JSON.stringify(data, null, 2));
+
+        if (data.error) {
+            console.error('Google API Error:', data.error);
+            return generatePlaceholder(data.error.message);
+        }
+
         if (!data.items || data.items.length === 0) {
-            throw new Error('No images found');
+            console.error('No images found for prompt:', prompt);
+            return generatePlaceholder('No Images Found');
         }
 
         const imageUrl = data.items[0].link;
         console.log('Found image URL:', imageUrl);
 
-        // Download and save the image
-        const imageResponse = await fetch(imageUrl);
-        if (!imageResponse.ok) {
-            throw new Error(`Failed to download image: ${imageResponse.status}`);
-        }
+        try {
+            // Download and save the image
+            const imageResponse = await fetch(imageUrl);
+            if (!imageResponse.ok) {
+                throw new Error(`Failed to download image: ${imageResponse.status}`);
+            }
 
-        const arrayBuffer = await imageResponse.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        
-        const filename = `${crypto.randomBytes(16).toString('hex')}.png`;
-        const filepath = path.join(imagesDir, filename);
-        
-        await fs.writeFile(filepath, buffer);
-        console.log('Image saved successfully to:', filepath);
-        
-        return `/generated-images/${filename}`;
+            const arrayBuffer = await imageResponse.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            
+            const filename = `${crypto.randomBytes(16).toString('hex')}.png`;
+            const filepath = path.join(imagesDir, filename);
+            
+            await fs.writeFile(filepath, buffer);
+            console.log('Image saved successfully to:', filepath);
+            
+            return `/generated-images/${filename}`;
+        } catch (downloadError) {
+            console.error('Error downloading image:', downloadError);
+            // If download fails, return the direct URL instead
+            return imageUrl;
+        }
     } catch (error) {
         console.error('Error in searchAndSaveImage:', error);
-        return 'https://placehold.co/512x512/333/fff/png?text=Image+Search+Failed';
+        return generatePlaceholder('Image Search Failed');
     }
+}
+
+// Helper function to generate placeholder images
+function generatePlaceholder(message) {
+    const encodedMessage = encodeURIComponent(message);
+    return `https://placehold.co/512x512/333/fff/png?text=${encodedMessage}`;
 }
 
 // Add retry logic to image generation
@@ -179,8 +219,13 @@ async function generateAndSaveImage(prompt, retryCount = 0) {
     }
 }
 
-// Simplify the processImages function
+// Update the processImages function with better error handling
 async function processImages(content, generatedImages, useDallE) {
+    if (!content) {
+        console.error('Empty content received in processImages');
+        return { content: '', newImages: {} };
+    }
+
     const imageRegex = /{{generate_image:\s*(.*?)}}/g;
     let match;
     const newImages = {};
@@ -188,37 +233,59 @@ async function processImages(content, generatedImages, useDallE) {
 
     const imagePromises = [];
     while ((match = imageRegex.exec(content)) !== null) {
-        const imagePrompt = match[1];
+        const imagePrompt = match?.[1]?.trim();
+        const fullMatch = match?.[0];
+        
+        if (!imagePrompt || !fullMatch) {
+            console.warn('Invalid image prompt match:', match);
+            continue;
+        }
         
         if (generatedImages && generatedImages[imagePrompt]) {
-            processedContent = processedContent.replace(match[0], generatedImages[imagePrompt]);
+            const cachedImage = generatedImages[imagePrompt];
+            // Ensure cached images are wrapped in img tags
+            const imgTag = cachedImage.startsWith('<img') ? 
+                cachedImage : 
+                `<img src="${cachedImage}" alt="${imagePrompt}" style="max-width: 100%; height: auto; border-radius: 8px;">`;
+            processedContent = processedContent.replace(fullMatch, imgTag);
         } else {
             imagePromises.push(
                 generateImage(imagePrompt, useDallE)
                     .then(imagePath => ({
                         prompt: imagePrompt,
-                        imagePath,
-                        match: match[0]
+                        imagePath: imagePath || generatePlaceholder('Generation Failed'),
+                        match: fullMatch
                     }))
-                    .catch(error => ({
-                        prompt: imagePrompt,
-                        imagePath: 'https://placehold.co/512x512/333/fff/png?text=Image+Generation+Failed',
-                        match: match[0],
-                        error
-                    }))
+                    .catch(error => {
+                        console.error(`Error generating image for prompt "${imagePrompt}":`, error);
+                        return {
+                            prompt: imagePrompt,
+                            imagePath: generatePlaceholder('Generation Error'),
+                            match: fullMatch,
+                            error
+                        };
+                    })
             );
         }
     }
 
     if (imagePromises.length > 0) {
-        const results = await Promise.all(imagePromises);
-        
-        for (const { prompt, imagePath, match, error } of results) {
-            if (error) {
-                console.error(`Error generating image for prompt "${prompt}":`, error);
+        try {
+            const results = await Promise.all(imagePromises);
+            
+            for (const result of results) {
+                if (!result || !result.match || !result.imagePath) {
+                    console.warn('Invalid result from image generation:', result);
+                    continue;
+                }
+                
+                processedContent = processedContent.replace(result.match, result.imagePath);
+                if (result.prompt) {
+                    newImages[result.prompt] = result.imagePath;
+                }
             }
-            processedContent = processedContent.replace(match, imagePath);
-            newImages[prompt] = imagePath;
+        } catch (error) {
+            console.error('Error processing image promises:', error);
         }
     }
 
@@ -228,17 +295,43 @@ async function processImages(content, generatedImages, useDallE) {
     };
 }
 
-// Update the /generate endpoint
+// Update the /generate endpoint to handle initial and subsequent prompts differently
 app.post('/generate', async (req, res) => {
     const prompt = req.query.prompt;
     const model = req.query.model || 'gpt-3.5-turbo';
-    const { currentCode, generatedImages, useDallE = true } = req.body;
+    const { currentCode, generatedImages, useDallE = true, isInitialPrompt = true } = req.body;
 
     if (!prompt) {
         return res.status(400).send('Prompt is required');
     }
 
     try {
+        const promptContent = isInitialPrompt ? 
+            `Create a web page with the following prompt: ${prompt}. 
+            Include product images using the syntax {{generate_image: description of product}}.
+            The HTML should render the image link in an image tag like this:
+            <img src="{{generate_image: professional photo of product}}" alt="Product description">
+            
+            Make sure to:
+            1. Generate unique images for each product
+            2. Include proper image descriptions in the generate_image tags
+            3. Use descriptive alt text for accessibility
+            4. Keep image sizes reasonable
+            5. Always wrap image placeholders in proper <img> tags
+            
+            Current HTML: ${currentCode || 'None'}
+            Just return the HTML and nothing else.` 
+            : 
+            `Update the current HTML with the following changes: ${prompt}
+            
+            Keep all existing image tags and their structure.
+            If new images are needed, use the same format: {{generate_image: description}}
+            
+            Current HTML:
+            ${currentCode}
+            
+            Just return the complete updated HTML and nothing else.`;
+
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -249,20 +342,7 @@ app.post('/generate', async (req, res) => {
                 model: model,
                 messages: [{ 
                     role: 'user', 
-                    content: `Create a web page with the following prompt: ${prompt}. 
-                    Include product images using the syntax {{generate_image: description of product}}.
-                    The HTML should render the image link in an image tag like this:
-                    <img src="{{generate_image: professional photo of product}}" alt="Product description">
-                    
-                    Make sure to:
-                    1. Generate unique images for each product
-                    2. Include proper image descriptions in the generate_image tags
-                    3. Use descriptive alt text for accessibility
-                    4. Keep image sizes reasonable
-                    5. Always wrap image placeholders in proper <img> tags
-                    
-                    Current HTML: ${currentCode || 'None'}
-                    Just return the HTML and nothing else.` 
+                    content: promptContent
                 }],
                 max_tokens: 4096
             })

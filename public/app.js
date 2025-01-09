@@ -5,6 +5,9 @@ let generatedImages = new Map(); // Store image prompts and their paths
 // Add toggle state management
 let useDallE = true;
 
+// Add a flag to track initial prompt
+let isFirstPrompt = true;
+
 document.getElementById("imageSourceToggle").addEventListener("change", function(e) {
     useDallE = e.target.checked;
     // Update the toggle label
@@ -83,22 +86,28 @@ document.getElementById("generateButton").addEventListener("click", async functi
                 body: JSON.stringify({
                     currentCode,
                     generatedImages: Object.fromEntries(generatedImages),
-                    useDallE
+                    useDallE,
+                    isInitialPrompt: isFirstPrompt
                 })
             });
 
             const data = await response.json();
             
-            // Display the generated code with loading placeholders
+            // Update the flag after first prompt
+            isFirstPrompt = false;
+            
+            // Display the generated code
             document.getElementById("codeInput").value = data.code.trim();
             
-            // Update the iframe with loading states
+            // Update the iframe
             updateIframeContent(data.code);
             iframe.style.backgroundColor = "white";
             
-            // Set up image loading handling
-            if (data.pendingImages > 0) {
-                updateLoadingImages(data.code);
+            // Update generated images cache
+            if (data.newImages) {
+                Object.entries(data.newImages).forEach(([prompt, path]) => {
+                    generatedImages.set(prompt, path);
+                });
             }
 
         } catch (error) {
@@ -138,6 +147,7 @@ document.getElementById("clearButton").addEventListener("click", function() {
     promptHistory = [];
     generatedImages.clear();
     updateHistoryDisplay();
+    isFirstPrompt = true; // Reset the flag
 });
 
 // Open in new tab functionality
