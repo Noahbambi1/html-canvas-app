@@ -24,19 +24,22 @@ app.post('/generate', async (req, res) => {
                 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
             },
             body: JSON.stringify({
-                model: 'gpt-4o-mini-2024-07-18',  // Use the newer model
-                messages: [{ role: 'user', content: `in html ${prompt}, just return the html and nothing else` }],  // New message structure
+                model: 'gpt-4o-mini-2024-07-18',
+                messages: [{ role: 'user', content: `in html ${prompt}, just return the html and nothing else` }],
                 max_tokens: 4096
             })
         });
 
-        // Log the full response for debugging
         const data = await response.json();
         console.log("API Response:", data);
 
-        // Check if the response contains 'choices' and has at least one result
         if (data && data.choices && data.choices.length > 0) {
-            const generatedCode = data.choices[0].message.content.trim();
+            let generatedCode = data.choices[0].message.content.trim();
+            
+            // Remove markdown code block markers if they exist
+            generatedCode = generatedCode.replace(/^```html\n?/, '');
+            generatedCode = generatedCode.replace(/\n?```$/, '');
+            
             res.json({ code: generatedCode });
         } else {
             res.status(500).send('Error: No choices found in the response');

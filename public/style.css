@@ -107,6 +107,42 @@ html, body {
     width: 100%;
     height: 100%;
     border: 1px solid #444;
-    background-color: #121212;
     border-radius: 8px;
+}
+
+.content-wrapper {
+    position: relative;
+    flex: 1;
+    display: flex;
+}
+
+.spinner {
+    display: none;
+    width: 50px;
+    height: 50px;
+    border: 5px solid #f3f3f3;
+    border-top: 5px solid #4CAF50;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+#generateButton:disabled {
+    background-color: #666;
+    cursor: not-allowed;
+}
+
+#codeInput, #iframe {
+    position: relative;
+    width: 100%;
+    height: 100%;
 }

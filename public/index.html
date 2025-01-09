@@ -12,17 +12,24 @@
         <div id="prompt">
             <textarea id="promptInput" placeholder="Enter your prompt here..."></textarea>
             <button id="generateButton">Generate HTML</button>
+            <div class="spinner" id="loadingSpinner"></div>
         </div>
 
         <div id="splitter">
             <div id="codeSection">
                 <h2>Generated HTML Code</h2>
-                <textarea id="codeInput" readonly></textarea>
+                <div class="content-wrapper">
+                    <textarea id="codeInput"></textarea>
+                    <div class="spinner" id="codeSpinner"></div>
+                </div>
             </div>
 
             <div id="renderedSection">
                 <h2>Rendered HTML</h2>
-                <iframe id="iframe" srcdoc="<html><body></body></html>"></iframe>
+                <div class="content-wrapper">
+                    <iframe id="iframe" srcdoc="<html><body></body></html>"></iframe>
+                    <div class="spinner" id="renderSpinner"></div>
+                </div>
             </div>
         </div>
     </div>
