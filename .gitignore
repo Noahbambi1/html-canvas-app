@@ -133,3 +133,6 @@ dist
 /node_modules/
 
 # n
+
+# dotenv environment variable files
+.env
