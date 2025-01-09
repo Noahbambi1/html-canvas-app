@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI HTML Generator</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="header">AI HTML Generator</div>
+    <div id="app">
+        <div id="prompt">
+            <textarea id="promptInput" placeholder="Enter your prompt here..."></textarea>
+            <button id="generateButton">Generate HTML</button>
+        </div>
+
+        <div id="splitter">
+            <div id="codeSection">
+                <h2>Generated HTML Code</h2>
+                <textarea id="codeInput" readonly></textarea>
+            </div>
+
+            <div id="renderedSection">
+                <h2>Rendered HTML</h2>
+                <iframe id="iframe" srcdoc="<html><body></body></html>"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
