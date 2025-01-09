@@ -137,4 +137,8 @@ dist
 
 # n
 
+node_modules/
+.env
+public/generated-images/
+
 
