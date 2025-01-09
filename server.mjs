@@ -19,6 +19,7 @@ try {
 }
 
 app.use(express.static('public'));
+app.use(express.json()); // Add this near the top with other middleware
 
 // Add new endpoint for image generation
 async function generateAndSaveImage(prompt) {
@@ -66,6 +67,7 @@ async function generateAndSaveImage(prompt) {
 app.post('/generate', async (req, res) => {
     const prompt = req.query.prompt;
     const model = req.query.model || 'gpt-4';
+    const { currentCode, generatedImages } = req.body;
 
     if (!prompt) {
         return res.status(400).send('Prompt is required');
@@ -82,7 +84,8 @@ app.post('/generate', async (req, res) => {
                 model: model,
                 messages: [{ 
                     role: 'user', 
-                    content: `Create HTML with the following prompt: ${prompt}. 
+                    content: `Update or create HTML with the following prompt: ${prompt}. 
+                    Current HTML: ${currentCode || 'None'}
                     You can include images by using the syntax {{generate_image: image description}}.
                     Just return the HTML and nothing else.` 
                 }],
@@ -95,26 +98,35 @@ app.post('/generate', async (req, res) => {
 
         if (data && data.choices && data.choices.length > 0) {
             let generatedCode = data.choices[0].message.content.trim();
-            
-            // Remove markdown code block markers if they exist
             generatedCode = generatedCode.replace(/^```html\n?/, '');
             generatedCode = generatedCode.replace(/\n?```$/, '');
 
             // Process any image generation requests in the HTML
             const imageRegex = /{{generate_image:\s*(.*?)}}/g;
             let match;
+            const newImages = {};
+
             while ((match = imageRegex.exec(generatedCode)) !== null) {
                 const imagePrompt = match[1];
                 try {
-                    const imagePath = await generateAndSaveImage(imagePrompt);
-                    generatedCode = generatedCode.replace(match[0], imagePath);
+                    // Check if image was already generated
+                    if (generatedImages && generatedImages[imagePrompt]) {
+                        generatedCode = generatedCode.replace(match[0], generatedImages[imagePrompt]);
+                    } else {
+                        const imagePath = await generateAndSaveImage(imagePrompt);
+                        generatedCode = generatedCode.replace(match[0], imagePath);
+                        newImages[imagePrompt] = imagePath;
+                    }
                 } catch (error) {
                     console.error('Error generating image:', error);
                     generatedCode = generatedCode.replace(match[0], '/path/to/error-image.png');
                 }
             }
             
-            res.json({ code: generatedCode });
+            res.json({ 
+                code: generatedCode,
+                newImages
+            });
         } else {
             res.status(500).send('Error: No choices found in the response');
         }

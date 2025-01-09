@@ -27,11 +27,15 @@
                 <button id="clearButton">Clear All</button>
             </div>
             <div class="spinner" id="loadingSpinner"></div>
+            <div id="promptHistory"></div>
         </div>
 
         <div id="splitter">
             <div id="codeSection">
-                <h2>Generated HTML Code</h2>
+                <div class="section-header">
+                    <h2>Generated HTML Code</h2>
+                    <button id="copyToClipboard">Copy Code</button>
+                </div>
                 <div class="content-wrapper">
                     <textarea id="codeInput"></textarea>
                     <div class="spinner" id="codeSpinner"></div>

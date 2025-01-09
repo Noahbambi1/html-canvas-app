@@ -230,3 +230,58 @@ html, body {
 #openInNewTab:hover {
     background-color: #1976D2;
 }
+
+#promptHistory {
+    margin-top: 10px;
+    padding: 10px;
+    background-color: #2a2a2a;
+    border-radius: 8px;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.history-item {
+    padding: 8px;
+    margin-bottom: 5px;
+    background-color: #333;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.history-item:hover {
+    background-color: #404040;
+}
+
+.history-item:last-child {
+    margin-bottom: 0;
+}
+
+#copyToClipboard {
+    padding: 6px 12px;
+    cursor: pointer;
+    background-color: #2196F3;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 12px;
+}
+
+#copyToClipboard:hover {
+    background-color: #1976D2;
+}
+
+/* Style for the scrollbar in prompt history */
+#promptHistory::-webkit-scrollbar {
+    width: 8px;
+}
+
+#promptHistory::-webkit-scrollbar-track {
+    background: #1f1f1f;
+    border-radius: 4px;
+}
+
+#promptHistory::-webkit-scrollbar-thumb {
+    background: #4CAF50;
+    border-radius: 4px;
+}
