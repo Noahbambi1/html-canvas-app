@@ -11,6 +11,7 @@ app.use(express.static('public'));
 
 app.post('/generate', async (req, res) => {
     const prompt = req.query.prompt;
+    const model = req.query.model || 'gpt-4'; // Default to gpt-4 if no model specified
 
     if (!prompt) {
         return res.status(400).send('Prompt is required');
@@ -24,7 +25,7 @@ app.post('/generate', async (req, res) => {
                 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
             },
             body: JSON.stringify({
-                model: 'gpt-4o-mini-2024-07-18',
+                model: model,
                 messages: [{ role: 'user', content: `in html ${prompt}, just return the html and nothing else` }],
                 max_tokens: 4096
             })

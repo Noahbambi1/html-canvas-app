@@ -1,5 +1,6 @@
 document.getElementById("generateButton").addEventListener("click", async function () {
     const prompt = document.getElementById("promptInput").value;
+    const model = document.getElementById("modelSelect").value;
     const codeSpinner = document.getElementById("codeSpinner");
     const renderSpinner = document.getElementById("renderSpinner");
     const generateButton = document.getElementById("generateButton");
@@ -14,7 +15,7 @@ document.getElementById("generateButton").addEventListener("click", async functi
             iframe.style.backgroundColor = "#121212"; // Reset to dark background while loading
 
             // Request the server to generate HTML code
-            const response = await fetch(`/generate?prompt=${encodeURIComponent(prompt)}`, {
+            const response = await fetch(`/generate?prompt=${encodeURIComponent(prompt)}&model=${encodeURIComponent(model)}`, {
                 method: 'POST',
             });
 

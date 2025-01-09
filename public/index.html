@@ -7,7 +7,18 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="header">AI HTML Generator</div>
+    <div id="header">
+        <div class="header-content">
+            <div class="title">AI HTML Generator</div>
+            <div class="model-selector">
+                <select id="modelSelect">
+                    <option value="gpt-4">GPT-4</option>
+                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                    <option value="gpt-4-turbo-preview">GPT-4 Turbo</option>
+                </select>
+            </div>
+        </div>
+    </div>
     <div id="app">
         <div id="prompt">
             <textarea id="promptInput" placeholder="Enter your prompt here..."></textarea>
