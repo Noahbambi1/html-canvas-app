@@ -221,12 +221,16 @@ async function generateAndSaveImage(prompt, retryCount = 0) {
     }
 }
 
-// Update the processImages function to handle image tags properly
+// Update the processImages function to ensure no double-wrapping
 async function processImages(content, generatedImages, useDallE) {
     if (!content) {
         console.error('Empty content received in processImages');
         return { content: '', newImages: {} };
     }
+
+    // First, remove any img tags that might be wrapping our generate_image placeholders
+    content = content.replace(/<img[^>]*>({{\s*generate_image:[^}]+}})<\/img>/g, '$1');
+    content = content.replace(/<img[^>]*>({{\s*generate_image:[^}]+}})/g, '$1');
 
     const imageRegex = /{{generate_image:\s*(.*?)}}/g;
     let match;
@@ -311,16 +315,20 @@ app.post('/generate', async (req, res) => {
     try {
         const promptContent = isInitialPrompt ? 
             `Create a web page with the following prompt: ${prompt}. 
-            Include product images using the syntax {{generate_image: description of product}}.
-            The HTML should render the image link in an image tag like this:
-            <img src="{{generate_image: professional photo of product}}" alt="Product description">
+            For images, use this exact syntax without wrapping in img tags:
+            {{generate_image: description of image}}
+            
+            Example:
+            <div class="product">
+                {{generate_image: red sports car}}
+                <h2>Sports Car</h2>
+            </div>
             
             Make sure to:
             1. Generate unique images for each product
-            2. Include proper image descriptions in the generate_image tags
-            3. Use descriptive alt text for accessibility
-            4. Keep image sizes reasonable
-            5. Always wrap image placeholders in proper <img> tags
+            2. Include proper image descriptions
+            3. DO NOT wrap {{generate_image}} placeholders in img tags
+            4. Keep image descriptions clear and specific
             
             Current HTML: ${currentCode || 'None'}
             Just return the HTML and nothing else.` 
@@ -328,7 +336,8 @@ app.post('/generate', async (req, res) => {
             `Update the current HTML with the following changes: ${prompt}
             
             Keep all existing image tags and their structure.
-            If new images are needed, use the same format: {{generate_image: description}}
+            For new images, use this exact syntax without wrapping in img tags:
+            {{generate_image: description of image}}
             
             Current HTML:
             ${currentCode}
