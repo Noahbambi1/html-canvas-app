@@ -2,6 +2,7 @@ let projectFiles = new Map();
 let promptHistory = [];
 let generatedImages = new Map();
 let currentFile = null;
+let useDallE = true;
 
 // Initialize the application
 function init() {
@@ -18,6 +19,11 @@ function attachEventListeners() {
     document.getElementById("fileTree").addEventListener("click", handleFileSelect);
     document.getElementById("promptHistory").addEventListener("click", handleHistoryClick);
     document.getElementById("codeInput").addEventListener("input", handleCodeEdit);
+    document.getElementById("imageSourceToggle").addEventListener("change", function(e) {
+        useDallE = e.target.checked;
+        // Update the toggle label
+        document.querySelector('.toggle-label').textContent = useDallE ? 'DALL-E Images' : 'Google Images';
+    });
 }
 
 async function generateProject() {
@@ -39,7 +45,8 @@ async function generateProject() {
             },
             body: JSON.stringify({
                 currentFiles: Object.fromEntries(projectFiles),
-                generatedImages: Object.fromEntries(generatedImages)
+                generatedImages: Object.fromEntries(generatedImages),
+                useDallE
             })
         });
 

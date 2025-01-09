@@ -6,6 +6,8 @@ import path from 'path';
 import crypto from 'crypto';
 import archiver from 'archiver';
 import { setTimeout } from 'timers/promises';
+import { WebSocketServer } from 'ws';
+import http from 'http';
 
 dotenv.config();
 
@@ -31,6 +33,56 @@ const imageRateLimit = {
     lastReset: Date.now()
 };
 
+// Replace the Google Custom Search configuration
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+const SEARCH_ENGINE_ID = process.env.SEARCH_ENGINE_ID;
+
+// Modified image generation function
+async function generateImage(prompt, useDallE = true) {
+    if (useDallE) {
+        return generateAndSaveImage(prompt);
+    } else {
+        return searchAndSaveImage(prompt);
+    }
+}
+
+// Add Google image search function
+async function searchAndSaveImage(prompt) {
+    try {
+        const searchUrl = `https://customsearch.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${SEARCH_ENGINE_ID}&q=${encodeURIComponent(prompt)}&searchType=image&num=1&safe=active`;
+        
+        const response = await fetch(searchUrl);
+        const data = await response.json();
+
+        if (!data.items || data.items.length === 0) {
+            throw new Error('No images found');
+        }
+
+        const imageUrl = data.items[0].link;
+        console.log('Found image URL:', imageUrl);
+
+        // Download and save the image
+        const imageResponse = await fetch(imageUrl);
+        if (!imageResponse.ok) {
+            throw new Error(`Failed to download image: ${imageResponse.status}`);
+        }
+
+        const arrayBuffer = await imageResponse.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        
+        const filename = `${crypto.randomBytes(16).toString('hex')}.png`;
+        const filepath = path.join(imagesDir, filename);
+        
+        await fs.writeFile(filepath, buffer);
+        console.log('Image saved successfully to:', filepath);
+        
+        return `/generated-images/${filename}`;
+    } catch (error) {
+        console.error('Error in searchAndSaveImage:', error);
+        return 'https://placehold.co/512x512/333/fff/png?text=Image+Search+Failed';
+    }
+}
+
 // Add retry logic to image generation
 async function generateAndSaveImage(prompt, retryCount = 0) {
     const maxRetries = 3;
@@ -47,7 +99,7 @@ async function generateAndSaveImage(prompt, retryCount = 0) {
         // If we're at the limit, wait or retry
         if (imageRateLimit.queue.length >= imageRateLimit.limit) {
             if (retryCount >= maxRetries) {
-                throw new Error('Max retries reached for image generation');
+                return 'https://placehold.co/512x512/333/fff/png?text=Rate+Limit+Reached';
             }
             console.log(`Rate limit reached, waiting ${retryDelay/1000} seconds before retry ${retryCount + 1}...`);
             await setTimeout(retryDelay);
@@ -73,72 +125,114 @@ async function generateAndSaveImage(prompt, retryCount = 0) {
             })
         });
 
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`DALL-E API Error: ${errorData.error?.message || response.statusText}`);
+        }
+
         const data = await response.json();
-        
-        // Log the full response for debugging
         console.log('DALL-E API Response:', JSON.stringify(data, null, 2));
 
-        // Check if there's an error in the response
-        if (data.error) {
-            // If it's a rate limit error, retry
-            if (data.error.message.includes('Rate limit exceeded') && retryCount < maxRetries) {
-                console.log(`Rate limit error, waiting ${retryDelay/1000} seconds before retry ${retryCount + 1}...`);
-                await setTimeout(retryDelay);
-                return generateAndSaveImage(prompt, retryCount + 1);
-            }
-            throw new Error(`DALL-E API Error: ${data.error.message}`);
-        }
-        
-        if (!data.data || !data.data[0] || !data.data[0].url) {
-            throw new Error(`Invalid response structure: ${JSON.stringify(data)}`);
+        // Validate response structure
+        if (!data?.data?.[0]?.url) {
+            console.error('Invalid DALL-E response structure:', data);
+            return 'https://placehold.co/512x512/333/fff/png?text=Invalid+Response';
         }
 
-        // Download the image
         const imageUrl = data.data[0].url;
-        console.log('Attempting to download image from:', imageUrl);
-        
+        console.log('Downloading image from:', imageUrl);
+
+        // Download the image
         const imageResponse = await fetch(imageUrl);
         if (!imageResponse.ok) {
-            throw new Error(`Failed to download image: ${imageResponse.status} ${imageResponse.statusText}`);
+            throw new Error(`Failed to download image: ${imageResponse.status}`);
         }
 
         const arrayBuffer = await imageResponse.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
         
-        // Generate unique filename
         const filename = `${crypto.randomBytes(16).toString('hex')}.png`;
         const filepath = path.join(imagesDir, filename);
         
-        // Save the image
         await fs.writeFile(filepath, buffer);
         console.log('Image saved successfully to:', filepath);
         
-        // Return the path relative to public directory
         return `/generated-images/${filename}`;
-    } catch (error) {
-        console.error('Error in generateAndSaveImage:', error);
-        console.error('Error details:', {
-            message: error.message,
-            stack: error.stack,
-            prompt: prompt,
-            retryCount
-        });
 
-        // If we haven't hit max retries and it's a rate limit error, retry
+    } catch (error) {
+        console.error('Error in generateAndSaveImage:', {
+            message: error.message,
+            prompt: prompt,
+            retryCount: retryCount
+        });
+        
+        // Handle rate limit errors
         if (error.message.includes('Rate limit exceeded') && retryCount < maxRetries) {
             console.log(`Rate limit error, waiting ${retryDelay/1000} seconds before retry ${retryCount + 1}...`);
             await setTimeout(retryDelay);
             return generateAndSaveImage(prompt, retryCount + 1);
         }
 
-        throw error;
+        // For other errors, return a placeholder with the error message
+        const errorMessage = error.message.replace(/[^a-zA-Z0-9]/g, '+');
+        return `https://placehold.co/512x512/333/fff/png?text=${errorMessage}`;
     }
 }
 
+// Simplify the processImages function
+async function processImages(content, generatedImages, useDallE) {
+    const imageRegex = /{{generate_image:\s*(.*?)}}/g;
+    let match;
+    const newImages = {};
+    let processedContent = content;
+
+    const imagePromises = [];
+    while ((match = imageRegex.exec(content)) !== null) {
+        const imagePrompt = match[1];
+        
+        if (generatedImages && generatedImages[imagePrompt]) {
+            processedContent = processedContent.replace(match[0], generatedImages[imagePrompt]);
+        } else {
+            imagePromises.push(
+                generateImage(imagePrompt, useDallE)
+                    .then(imagePath => ({
+                        prompt: imagePrompt,
+                        imagePath,
+                        match: match[0]
+                    }))
+                    .catch(error => ({
+                        prompt: imagePrompt,
+                        imagePath: 'https://placehold.co/512x512/333/fff/png?text=Image+Generation+Failed',
+                        match: match[0],
+                        error
+                    }))
+            );
+        }
+    }
+
+    if (imagePromises.length > 0) {
+        const results = await Promise.all(imagePromises);
+        
+        for (const { prompt, imagePath, match, error } of results) {
+            if (error) {
+                console.error(`Error generating image for prompt "${prompt}":`, error);
+            }
+            processedContent = processedContent.replace(match, imagePath);
+            newImages[prompt] = imagePath;
+        }
+    }
+
+    return {
+        content: processedContent,
+        newImages
+    };
+}
+
+// Update the /generate endpoint
 app.post('/generate', async (req, res) => {
     const prompt = req.query.prompt;
     const model = req.query.model || 'gpt-3.5-turbo';
-    const { currentCode, generatedImages } = req.body;
+    const { currentCode, generatedImages, useDallE = true } = req.body;
 
     if (!prompt) {
         return res.status(400).send('Prompt is required');
@@ -175,49 +269,17 @@ app.post('/generate', async (req, res) => {
         });
 
         const data = await response.json();
-        console.log("API Response:", data);
 
         if (data && data.choices && data.choices.length > 0) {
             let generatedCode = data.choices[0].message.content.trim();
-            generatedCode = generatedCode.replace(/^```html\n?/, '');
-            generatedCode = generatedCode.replace(/\n?```$/, '');
-
-            // Process any image generation requests in the HTML
-            const imageRegex = /{{generate_image:\s*(.*?)}}/g;
-            let match;
-            const newImages = {};
-
-            while ((match = imageRegex.exec(generatedCode)) !== null) {
-                const imagePrompt = match[1];
-                try {
-                    // Check if image was already generated
-                    if (generatedImages && generatedImages[imagePrompt]) {
-                        generatedCode = generatedCode.replace(match[0], generatedImages[imagePrompt]);
-                    } else {
-                        try {
-                            const imagePath = await generateAndSaveImage(imagePrompt);
-                            generatedCode = generatedCode.replace(match[0], imagePath);
-                            newImages[imagePrompt] = imagePath;
-                        } catch (imageError) {
-                            console.error('Failed to generate image:', imageError);
-                            // Use a placeholder image instead of failing completely
-                            generatedCode = generatedCode.replace(
-                                match[0], 
-                                'https://placehold.co/512x512/333/fff/png?text=Image+Generation+Failed'
-                            );
-                        }
-                    }
-                } catch (error) {
-                    console.error('Error processing image:', error);
-                    generatedCode = generatedCode.replace(
-                        match[0], 
-                        'https://placehold.co/512x512/333/fff/png?text=Image+Generation+Failed'
-                    );
-                }
-            }
             
+            // Process and wait for all images
+            const { content: processedContent, newImages } = 
+                await processImages(generatedCode, generatedImages, useDallE);
+
+            // Send final response with all images processed
             res.json({ 
-                code: generatedCode,
+                code: processedContent,
                 newImages
             });
         } else {
@@ -234,7 +296,7 @@ app.post('/generate', async (req, res) => {
 app.post('/generate-project', async (req, res) => {
     const prompt = req.query.prompt;
     const model = req.query.model || 'gpt-3.5-turbo';
-    const { currentFiles, generatedImages } = req.body;
+    const { currentFiles, generatedImages, useDallE = true } = req.body;
 
     if (!prompt) {
         return res.status(400).send('Prompt is required');
@@ -299,7 +361,7 @@ app.post('/generate-project', async (req, res) => {
                         if (generatedImages && generatedImages[imagePrompt]) {
                             processedContent = processedContent.replace(match[0], generatedImages[imagePrompt]);
                         } else {
-                            const imagePath = await generateAndSaveImage(imagePrompt);
+                            const imagePath = await generateImage(imagePrompt, useDallE);
                             processedContent = processedContent.replace(match[0], imagePath);
                             newImages[imagePrompt] = imagePath;
                         }
@@ -351,6 +413,49 @@ app.post('/download-project', (req, res) => {
     archive.finalize();
 });
 
-app.listen(port, () => {
+const server = http.createServer(app);
+const wss = new WebSocketServer({ server });
+
+// Handle WebSocket connections
+wss.on('connection', function connection(ws) {
+    ws.on('error', console.error);
+    
+    // Send a ping every 30 seconds to keep connection alive
+    const interval = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.ping();
+        }
+    }, 30000);
+
+    ws.on('close', () => {
+        clearInterval(interval);
+    });
+});
+
+// Update image generation to notify clients
+function notifyImageGenerated(loadingId, imagePath) {
+    try {
+        const message = JSON.stringify({
+            type: 'imageGenerated',
+            loadingId,
+            imagePath
+        });
+
+        wss.clients.forEach(function each(client) {
+            if (client.readyState === WebSocket.OPEN) {
+                try {
+                    client.send(message);
+                } catch (err) {
+                    console.error('Error sending to client:', err);
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Error in notifyImageGenerated:', error);
+    }
+}
+
+// Start the server with WebSocket support
+server.listen(port, () => {
     console.log(`Server is running on http://localhost:${port}`);
 });

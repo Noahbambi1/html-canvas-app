@@ -14,12 +14,21 @@
                 <a href="index.html" class="active">Single Page</a>
                 <a href="project.html">Project</a>
             </div>
-            <div class="model-selector">
-                <select id="modelSelect">
-                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                    <option value="gpt-4">GPT-4</option>
-                    <option value="gpt-4-turbo-preview">GPT-4 Turbo</option>
-                </select>
+            <div class="controls">
+                <div class="image-source">
+                    <label class="switch">
+                        <input type="checkbox" id="imageSourceToggle" checked>
+                        <span class="slider round"></span>
+                    </label>
+                    <span class="toggle-label">DALL-E Images</span>
+                </div>
+                <div class="model-selector">
+                    <select id="modelSelect">
+                        <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                        <option value="gpt-4">GPT-4</option>
+                        <option value="gpt-4-turbo-preview">GPT-4 Turbo</option>
+                    </select>
+                </div>
             </div>
         </div>
     </div>
