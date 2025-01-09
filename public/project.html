@@ -9,23 +9,26 @@
 <body>
     <div id="header">
         <div class="header-content">
-            <div class="title">AI Project Generator</div>
-            <div class="nav-links">
-                <a href="index.html">Single Page</a>
-                <a href="project.html" class="active">Project</a>
+            <div class="left-section">
+                <div class="title">AI Project Generator</div>
+                <nav class="nav-links">
+                    <a href="index.html">Single Page</a>
+                    <a href="project.html" class="active">Project</a>
+                    <a href="enhanced.html">Enhanced Project</a>
+                </nav>
             </div>
             <div class="controls">
                 <div class="image-source">
                     <label class="switch">
-                        <input type="checkbox" id="imageSourceToggle" checked>
+                        <input type="checkbox" id="imageSourceToggle">
                         <span class="slider round"></span>
                     </label>
-                    <span class="toggle-label">DALL-E Images</span>
+                    <span class="toggle-label">Google Images</span>
                 </div>
                 <div class="model-selector">
                     <select id="modelSelect">
                         <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                        <option value="gpt-4">GPT-4</option>
+                        <option value="gpt-4" selected>GPT-4</option>
                         <option value="gpt-4-turbo-preview">GPT-4 Turbo</option>
                     </select>
                 </div>

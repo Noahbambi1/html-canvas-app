@@ -3,14 +3,16 @@ let promptHistory = [];
 let generatedImages = new Map(); // Store image prompts and their paths
 
 // Add toggle state management
-let useDallE = true;
+let useDallE = false; // Default to Google Images
+document.getElementById("imageSourceToggle").checked = useDallE;
+document.querySelector('.toggle-label').textContent = useDallE ? 'DALL-E Images' : 'Google Images';
+document.getElementById("modelSelect").value = "gpt-4"; // Default to GPT-4
 
 // Add a flag to track initial prompt
 let isFirstPrompt = true;
 
 document.getElementById("imageSourceToggle").addEventListener("change", function(e) {
     useDallE = e.target.checked;
-    // Update the toggle label
     document.querySelector('.toggle-label').textContent = useDallE ? 'DALL-E Images' : 'Google Images';
 });
 

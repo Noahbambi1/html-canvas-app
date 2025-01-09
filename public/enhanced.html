@@ -3,18 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI HTML Generator</title>
+    <title>AI Enhanced Project Generator</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="header">
         <div class="header-content">
             <div class="left-section">
-                <div class="title">AI HTML Generator</div>
+                <div class="title">AI Enhanced Project Generator</div>
                 <nav class="nav-links">
-                    <a href="index.html" class="active">Single Page</a>
+                    <a href="index.html">Single Page</a>
                     <a href="project.html">Project</a>
-                    <a href="enhanced.html">Enhanced Project</a>
+                    <a href="enhanced.html" class="active">Enhanced Project</a>
                 </nav>
             </div>
             <div class="controls">
@@ -35,36 +35,51 @@
             </div>
         </div>
     </div>
-    <div id="app">
+
+    <div id="main">
         <div id="prompt">
             <div class="input-wrapper">
-                <textarea id="promptInput" placeholder="Enter your prompt here..."></textarea>
+                <textarea id="promptInput" placeholder="Describe your project (pages, features, styling, etc.)..."></textarea>
                 <button id="clearText" class="input-clear-button">×</button>
             </div>
+            <div class="prompt-options">
+                <label class="enhance-toggle">
+                    <input type="checkbox" id="enhancePromptToggle" checked>
+                    <span class="toggle-label">Enhance Prompt with AI</span>
+                </label>
+            </div>
             <div class="button-group">
-                <button id="generateButton">Generate HTML</button>
+                <button id="generateButton">Generate Project</button>
                 <button id="clearButton">Clear All</button>
+                <button id="downloadProject">Download Project</button>
             </div>
             <div class="spinner" id="loadingSpinner"></div>
             <div id="promptHistory"></div>
         </div>
 
         <div id="splitter">
-            <div id="codeSection">
+            <div id="projectFiles">
                 <div class="section-header">
-                    <h2>Generated HTML Code</h2>
-                    <button id="copyToClipboard">Copy Code</button>
+                    <h2>Project Files</h2>
+                    <button id="copyToClipboard">Copy Selected</button>
                 </div>
                 <div class="content-wrapper">
-                    <textarea id="codeInput"></textarea>
-                    <div class="spinner" id="codeSpinner"></div>
+                    <div id="fileTree"></div>
+                    <div id="fileContent">
+                        <textarea id="codeInput"></textarea>
+                    </div>
                 </div>
             </div>
 
             <div id="renderedSection">
                 <div class="section-header">
-                    <h2>Rendered HTML</h2>
-                    <button id="openInNewTab">Open in New Tab</button>
+                    <h2>Preview</h2>
+                    <div class="preview-controls">
+                        <select id="pageSelect">
+                            <option value="">Select Page...</option>
+                        </select>
+                        <button id="openInNewTab">Open in New Tab</button>
+                    </div>
                 </div>
                 <div class="content-wrapper">
                     <iframe id="iframe" srcdoc="<html><body></body></html>"></iframe>
@@ -74,6 +89,6 @@
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script src="enhanced.js"></script>
 </body>
-</html>
+</html> 

@@ -2,12 +2,16 @@ let projectFiles = new Map();
 let promptHistory = [];
 let generatedImages = new Map();
 let currentFile = null;
-let useDallE = true;
+let useDallE = false;
 let isFirstPrompt = true;
 
 // Initialize the application
 function init() {
     attachEventListeners();
+    // Set default values
+    document.getElementById("imageSourceToggle").checked = useDallE;
+    document.querySelector('.toggle-label').textContent = useDallE ? 'DALL-E Images' : 'Google Images';
+    document.getElementById("modelSelect").value = "gpt-4"; // Default to GPT-4
 }
 
 function attachEventListeners() {
@@ -22,7 +26,6 @@ function attachEventListeners() {
     document.getElementById("codeInput").addEventListener("input", handleCodeEdit);
     document.getElementById("imageSourceToggle").addEventListener("change", function(e) {
         useDallE = e.target.checked;
-        // Update the toggle label
         document.querySelector('.toggle-label').textContent = useDallE ? 'DALL-E Images' : 'Google Images';
     });
 }
@@ -128,39 +131,14 @@ function selectFile(filename) {
 }
 
 function updatePreview(filename) {
-    const iframe = document.getElementById("iframe");
     const content = projectFiles.get(filename);
-    
-    if (content) {
-        const baseUrl = window.location.origin;
-        const modifiedHtml = `
-            <html>
-                <head>
-                    <base href="${baseUrl}/">
-                    ${Array.from(projectFiles.keys())
-                        .filter(file => file.endsWith('.css'))
-                        .map(file => `<link rel="stylesheet" href="data:text/css;base64,${btoa(projectFiles.get(file))}">`)
-                        .join('\n')}
-                </head>
-                <body>
-                    ${content}
-                    <script>
-                        document.addEventListener('click', function(e) {
-                            if (e.target.tagName === 'A') {
-                                e.preventDefault();
-                                const href = e.target.getAttribute('href');
-                                if (href && href.endsWith('.html')) {
-                                    window.parent.postMessage({ type: 'changePage', page: href }, '*');
-                                } else {
-                                    window.open(href, '_blank');
-                                }
-                            }
-                        });
-                    </script>
-                </body>
-            </html>
-        `;
-        iframe.srcdoc = modifiedHtml;
+    const iframe = document.getElementById("iframe");
+    if (content && content.trim()) {
+        iframe.srcdoc = content;
+        iframe.classList.add('has-content');
+    } else {
+        iframe.srcdoc = "<html><body></body></html>";
+        iframe.classList.remove('has-content');
     }
 }
 
@@ -244,6 +222,10 @@ function clearAll() {
     generatedImages.clear();
     updateHistoryDisplay();
     isFirstPrompt = true;
+    const iframe = document.getElementById("iframe");
+    iframe.srcdoc = "<html><body></body></html>";
+    iframe.classList.remove('has-content');
+    iframe.style.backgroundColor = "#121212";
 }
 
 function showLoading(show) {
