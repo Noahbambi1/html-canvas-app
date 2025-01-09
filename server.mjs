@@ -386,56 +386,51 @@ app.post('/generate', async (req, res) => {
 
 // Update the project generation endpoint to match single-page logic
 app.post('/generate-project', async (req, res) => {
-    const prompt = req.query.prompt;
-    const model = req.query.model || 'gpt-3.5-turbo';
-    const { currentFiles, generatedImages, useDallE = true, isInitialPrompt = true } = req.body;
-
-    if (!prompt) {
-        return res.status(400).send('Prompt is required');
-    }
-
     try {
-        const promptContent = isInitialPrompt ? 
-            `Create a multi-page HTML project with the following prompt: ${prompt}. 
-            Current project files: ${JSON.stringify(currentFiles || {}, null, 2)}
-            
-            Return a JSON object with the following structure:
-            {
-                "files": {
-                    "index.html": "content",
-                    "style.css": "content",
-                    "other-pages.html": "content"
-                }
+        const { prompt, currentFiles, model, useDallE, generatedImages } = req.body;
+
+        // Log the incoming request data
+        console.log('Received generate project request:', {
+            prompt,
+            currentFiles,
+            model,
+            useDallE,
+            generatedImages
+        });
+
+        if (!prompt) {
+            return res.status(400).send('Prompt is required');
+        }
+
+        const promptContent = `Create a multi-page HTML project with the following prompt: ${prompt}. 
+        Current project files: ${JSON.stringify(currentFiles || {}, null, 2)}
+        
+        Return a JSON object with the following structure:
+        {
+            "files": {
+                "index.html": "content",
+                "style.css": "content",
+                "other-pages.html": "content"
             }
-            
-            For images, use this exact syntax without wrapping in img tags:
-            {{generate_image: description of image}}
-            
-            Example:
-            <div class="product">
-                {{generate_image: red sports car}}
-                <h2>Sports Car</h2>
-            </div>
-            
-            Make sure to:
-            1. Generate unique images for each product
-            2. Include proper image descriptions
-            3. DO NOT wrap {{generate_image}} placeholders in img tags
-            4. Keep image descriptions clear and specific
-            5. Include proper navigation between pages
-            
-            Just return the JSON and nothing else.`
-            :
-            `Update the project files with the following changes: ${prompt}
-            
-            Current project files: ${JSON.stringify(currentFiles || {}, null, 2)}
-            
-            Keep all existing image tags and their structure.
-            For new images, use this exact syntax without wrapping in img tags:
-            {{generate_image: description of image}}
-            
-            Return the complete updated project as a JSON object with the same structure.
-            Just return the JSON and nothing else.`;
+        }
+        
+        For images, use this exact syntax without wrapping in img tags:
+        {{generate_image: description of image}}
+        
+        Example:
+        <div class="product">
+            {{generate_image: red sports car}}
+            <h2>Sports Car</h2>
+        </div>
+        
+        Make sure to:
+        1. Generate unique images for each product
+        2. Include proper image descriptions
+        3. DO NOT wrap {{generate_image}} placeholders in img tags
+        4. Keep image descriptions clear and specific
+        5. Include proper navigation between pages
+        
+        Just return the JSON and nothing else.`;
 
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
@@ -458,7 +453,14 @@ app.post('/generate-project', async (req, res) => {
         if (data.choices && data.choices[0]) {
             let projectData;
             try {
-                projectData = JSON.parse(data.choices[0].message.content);
+                // Clean up the response to ensure it's valid JSON
+                const cleanedContent = data.choices[0].message.content
+                    .replace(/\\n/g, '')
+                    .replace(/\\t/g, '')
+                    .replace(/\\r/g, '')
+                    .trim();
+
+                projectData = JSON.parse(cleanedContent);
             } catch (e) {
                 console.error('Failed to parse JSON:', data.choices[0].message.content);
                 throw new Error('Invalid JSON response from AI');
@@ -528,6 +530,51 @@ app.post('/download-project', (req, res) => {
     });
 
     archive.finalize();
+});
+
+app.post('/plan-project', async (req, res) => {
+    const { prompt, model } = req.query;
+
+    if (!prompt) {
+        return res.status(400).json({ error: 'Prompt is required' });
+    }
+
+    try {
+        // Use the OpenAI Chat Completions API endpoint
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+            },
+            body: JSON.stringify({
+                model: model || 'gpt-3.5-turbo', // Default to a suitable model
+                messages: [
+                    { role: 'system', content: 'You are a helpful assistant that provides detailed web project plans.' },
+                    { role: 'user', content: `Please provide a detailed plan for a web project based on the following concept: ${prompt}. Include structural design, professional layouts, and a suitable theme.` }
+                ],
+                max_tokens: 300 // Adjust based on your needs
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`API request failed: ${response.statusText}`);
+        }
+
+        const enhancedData = await response.json();
+        
+        // Log the AI's response for debugging
+        console.log('AI Response:', JSON.stringify(enhancedData, null, 2));
+
+        const enhancedPrompt = enhancedData.choices[0].message.content.trim();
+
+        // Directly use the enhanced prompt without checking for a specific phrase
+        res.json({ enhancedPrompt });
+
+    } catch (error) {
+        console.error('Error enhancing prompt:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 const server = http.createServer(app);

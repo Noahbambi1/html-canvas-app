@@ -35,6 +35,13 @@ function attachEventListeners() {
     });
 }
 
+function showLoading(isLoading) {
+    const generateButton = document.getElementById("generateButton");
+    const loadingSpinner = document.getElementById("loadingSpinner");
+    generateButton.disabled = isLoading;
+    loadingSpinner.style.display = isLoading ? "block" : "none";
+}
+
 async function generateProject() {
     const promptInput = document.getElementById("promptInput");
     const prompt = promptInput.value;
@@ -53,30 +60,42 @@ async function generateProject() {
                 method: 'POST'
             });
 
-            projectPlan = await planResponse.json();
-            addToHistory(prompt, projectPlan.enhancedPrompt);
+            if (!planResponse.ok) {
+                throw new Error(`Failed to enhance prompt: ${planResponse.statusText}`);
+            }
+
+            const planData = await planResponse.json();
+            projectPlan = planData.enhancedPrompt;
+            addToHistory(prompt, projectPlan);
         } else {
             // Use original prompt without enhancement
+            projectPlan = prompt;
             addToHistory(prompt, "Direct generation without enhancement");
         }
 
-        // Step 2: Generate project files
+        // Log the project plan being sent
+        console.log('Sending project plan:', projectPlan);
+
+        // Step 2: Generate project files using the enhanced prompt
         const response = await fetch(`/generate-project`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                projectPlan: enhancePrompt ? projectPlan : {
-                    enhancedPrompt: prompt,
-                    files: Object.fromEntries(projectFiles)
-                },
+                prompt: projectPlan,
                 currentFiles: Object.fromEntries(projectFiles),
                 model,
                 useDallE,
                 generatedImages: Object.fromEntries(generatedImages)
             })
         });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Error response from server:', errorText);
+            throw new Error(`Failed to generate project: ${response.statusText}`);
+        }
 
         const data = await response.json();
 
@@ -103,7 +122,7 @@ async function generateProject() {
 
     } catch (error) {
         console.error('Error:', error);
-        alert('Failed to generate project. Please try again.');
+        alert(`Failed to generate project: ${error.message}`);
     } finally {
         showLoading(false);
     }
@@ -138,7 +157,52 @@ function updateHistoryDisplay() {
         .join('');
 }
 
+function updateFileTree() {
+    const fileTree = document.getElementById("fileTree");
+    fileTree.innerHTML = ''; // Clear existing file tree
+
+    projectFiles.forEach((content, path) => {
+        const fileItem = document.createElement('div');
+        fileItem.className = 'file-item';
+        fileItem.textContent = path;
+        fileItem.addEventListener('click', () => selectFile(path));
+        fileTree.appendChild(fileItem);
+    });
+}
+
+function selectFile(filePath) {
+    currentFile = filePath;
+    const codeInput = document.getElementById("codeInput");
+    codeInput.value = projectFiles.get(filePath) || '';
+
+    // Update the iframe to render the selected file
+    const iframe = document.getElementById("iframe");
+    if (filePath.endsWith('.html')) {
+        iframe.srcdoc = projectFiles.get(filePath) || '<html><body></body></html>';
+    } else {
+        iframe.srcdoc = '<html><body><h1>Preview not available for this file type</h1></body></html>';
+    }
+}
+
+function updatePageSelect() {
+    const pageSelect = document.getElementById("pageSelect");
+    pageSelect.innerHTML = ''; // Clear existing options
+
+    projectFiles.forEach((content, path) => {
+        const option = document.createElement('option');
+        option.value = path;
+        option.textContent = path;
+        pageSelect.appendChild(option);
+    });
+
+    // Automatically select the first page if available
+    if (pageSelect.options.length > 0) {
+        pageSelect.selectedIndex = 0;
+        selectFile(pageSelect.value);
+    }
+}
+
 // ... (rest of the existing functions from project.js)
 
 // Initialize the application
-init(); 
+init();
